@@ -1,10 +1,7 @@
-import { EventName } from "../../const/EventName";
 import { DirUrl, ResUrl } from "../../const/Url";
-import Events from "../../util/Events";
 import Res from "../../util/Res";
 import Tool from "../../util/Tool";
 import DialogBase from "./DialogBase";
-import Timer from "./Timer";
 import Tip from "./Tip";
 
 const { ccclass, property, disallowMultiple, menu } = cc._decorator;
@@ -76,14 +73,10 @@ export default class Layer extends cc.Component {
             return;
         }
 
-        Timer.reset();
-        cc.Camera.main.node.position = cc.v3(0, 0);
-        Events.emit(EventName.CAMERA_MOVE);
-
         this.MainLayer.destroyAllChildren();
-        this.clearDialogs();
+        this.closeDialogs();
         this.clearTips();
-        let node: cc.Node = cc.instantiate(prefab);
+        let node: cc.Node = Res.instantiate(prefab);
         node.setPosition(0, 0);
         this.MainLayer.addChild(node);
         return node;
@@ -102,9 +95,9 @@ export default class Layer extends cc.Component {
         }
 
         this.MainLayer.destroyAllChildren();
-        this.clearDialogs();
+        this.closeDialogs();
         this.clearTips();
-        let node: cc.Node = cc.instantiate(prefab);
+        let node: cc.Node = Res.instantiate(prefab);
         node.setPosition(0, 0);
         this.MainLayer.addChild(node);
         return node;
@@ -140,7 +133,7 @@ export default class Layer extends cc.Component {
             return;
         }
 
-        let node = cc.instantiate(prefab);
+        let node = Res.instantiate(prefab);
         this.DialogLayer.addChild(node);
         node.setPosition(0, 0);
         let cmpt = node.getComponent(DialogBase);
@@ -180,7 +173,7 @@ export default class Layer extends cc.Component {
             return;
         }
 
-        let node = cc.instantiate(prefab);
+        let node = Res.instantiate(prefab);
         this.DialogLayer.addChild(node);
         node.setPosition(0, 0);
         let cmpt = node.getComponent(DialogBase);
@@ -209,40 +202,31 @@ export default class Layer extends cc.Component {
     /**
      * 关闭遍历到的第一个弹窗
      * @param url prefab在resources/prefab/dialog/下的路径
+     * @param play true：调用playClose播放弹窗关闭动画；false：直接调用close关闭弹窗
      */
-    public closeDialog(url: string) {
+    public closeDialog(url: string, play: boolean = false) {
         let cmpt = this.getDialog(url);
-        cmpt?.close();
-    }
-
-    /**
-     * 关闭所有同路径弹窗
-     * @param url prefab在resources/prefab/dialog/下的路径
-     */
-    public closeDialogs(url: string) {
-        for (let i = this.DialogLayer.childrenCount - 1; i >= 0; i--) {
-            let node = this.DialogLayer.children[i];
-            let cmpt = node.getComponent(DialogBase);
-            if (!cmpt) {
-                continue;
-            }
-            if (cmpt.prefabUrl === url) {
-                cmpt.close();
-            }
+        if (!cmpt) {
+            return;
         }
+        play ? cmpt.playClose() : cmpt.close();
     }
 
     /**
-     * 关闭所有弹窗
+     * 关闭所有同路径弹窗，不传参则关闭所有弹窗
+     * @param url prefab在resources/prefab/dialog/下的路径
+     * @param play true：调用playClose播放弹窗关闭动画；false：直接调用close关闭弹窗
      */
-    public clearDialogs() {
+    public closeDialogs(url: string = '', play: boolean = false) {
         for (let i = this.DialogLayer.childrenCount - 1; i >= 0; i--) {
             let node = this.DialogLayer.children[i];
             let cmpt = node.getComponent(DialogBase);
             if (!cmpt) {
                 continue;
             }
-            cmpt.close();
+            if (!url || cmpt.prefabUrl === url) {
+                play ? cmpt.playClose() : cmpt.close();
+            }
         }
     }
 
@@ -327,7 +311,7 @@ export default class Layer extends cc.Component {
                 cc.error(`[Layer.showTip] can not load prefab: ${ResUrl.PREFAB.TIP}`);
                 return;
             }
-            tipNode = cc.instantiate(prefab);
+            tipNode = Res.instantiate(prefab);
             this.TipLayer.addChild(tipNode);
         }
 

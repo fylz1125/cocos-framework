@@ -1,5 +1,5 @@
 # Cocos Framework
-一个基于Cocos Creator2.4.6的框架
+一个基于Cocos Creator2.4.7的框架
 
 ## 目录
 - [前言](#preface)
@@ -9,6 +9,7 @@
     - [全局时间管理器](#framework-timer)
     - [全局层级管理](#framework-layer)
     - [全局事件管理器](#framework-events)
+    - [资源管理器](#framework-res)
     - [音频管理器](#framework-audio)
     - [多语言](#framework-i18n)
     - [一些ui组件](#framework-ui)
@@ -132,9 +133,8 @@ await Layer.inst.waitCloseDialog(DlgExample.pUrl);
     - **`openUniDialog(url: string, ...args: any[])`**  （同步方法，需确保事先已加载预制资源）打开唯一弹窗，同一弹窗只能同时存在一个
     - **`openDialogAsync(url: string, ...args: any[]): Promise<void>`**  （异步方法）打开弹窗
     - **`openUniDialogAsync(url: string, ...args: any[]): Promise<void>`**  （异步方法）打开唯一弹窗，同一弹窗节点只能同时存在一个
-    - **`closeDialog(url: string)`**  关闭遍历到的第一个弹窗
-    - **`closeDialogs(url: string)`**  关闭所有同路径弹窗
-    - **`clearDialogs()`**  关闭所有弹窗
+    - **`closeDialog(url: string, play: boolean = false)`**  关闭遍历到的第一个弹窗
+    - **`closeDialogs(url: string = '', play: boolean = false)`**  关闭所有同路径弹窗，不传参则关闭所有弹窗
     - **`waitCloseDialog(url: string): Promise<void>`**  异步等待弹窗关闭（只等待遍历到的第一个）
     - **`waitCloseDialogs(url: string): Promise<void>`**  异步等待所有同路径弹窗关闭
     - **`showTip(data: TipData | string)`**  弹出一条文字提示
@@ -150,7 +150,7 @@ await Layer.inst.waitCloseDialog(DlgExample.pUrl);
 ```typescript
 export default class Test extends cc.Component {
     protected onLoad() {
-        // 注册当前类使用装饰器绑定的所有事件
+        // 注册当前类使用preloadEvent装饰器绑定的所有事件
         Events.targetOn(this);
     }
 
@@ -159,6 +159,31 @@ export default class Test extends cc.Component {
         Events.targetOff(this);
     }
 
+    // 使用装饰器绑定对应事件监听的函数
+    @preloadEvent(EventName.GAME_PAUSE)
+    private eventGamePause() {
+        
+    }
+
+    @preloadEvent(EventName.GAME_RESUME)
+    private eventGameResume() {
+        
+    }
+
+    // 若装饰器第二个参数传true，则触发一次监听函数后会自动注销事件
+    @preloadEvent(EventName.TIME_SCALE, true)
+    private eventTimeScale() {
+        
+    }
+}
+```
+
+或者也可使用类装饰器覆盖onLoad中和onDestroy方法，并分别在其中调用targetOn与targetOff
+```typescript
+// 参数为true则会注册父类用preloadEvent绑定的事件
+// 参数为false则只注册当前类用preloadEvent绑定的事件
+@eventsOnLoad(true) // 也可使用@eventsOnEnable，对应于onEnable和onDisable
+export default class Test extends cc.Component {
     // 使用装饰器绑定对应事件监听的函数
     @preloadEvent(EventName.GAME_PAUSE)
     private eventGamePause() {
@@ -187,7 +212,9 @@ export default class Test extends cc.Component {
 ```
 
 - **装饰器**
-    - **`preloadEvent(event: EventName, once: boolean = false)`**  非静态成员函数装饰器，用于预先载入待注册的事件，配合targetOn使用
+    - **`eventsOnLoad(onSuper: boolean = true)`** 类装饰器。用于覆盖onLoad和onDestroy方法，在onLoad中注册preloadEvent绑定的所有事件，在onDestroy注销绑定的所有事件
+    - **`eventsOnEnable(onSuper: boolean = true)`** 类装饰器。用于覆盖onEnable和onDisable方法，在onEnable中注册preloadEvent绑定的所有事件，在onDisable注销绑定的所有事件
+    - **`preloadEvent(event: EventName, once: boolean = false)`**  非静态成员函数装饰器。用于预先载入待注册的事件，配合eventsOnLoad、eventsOnEnable、targetOn使用
     
 - **方法**
     - **`targetOn(target: Object, onSuper: boolean = true)`**  注册与target构造函数预先绑定的所有事件，配合装饰器preloadEvent使用
@@ -197,6 +224,21 @@ export default class Test extends cc.Component {
     - **`targetOff(target: Object)`**  移除target上注册的所有事件
     - **`emit(event: EventName, ...args: any[])`**  派发事件
     - **`emitAsync(event: EventName, ...args: any[]): Promise<void>`**  派发事件--异步
+
+#### <a id="framework-res"></a>资源管理器
+>文件路径(scripts/common/util/Res.ts)
+
+主要是对prefab、图片等进行资源管理，内部自动进行引用计数的加减,使用时需要注意以下要点：
+1. 尽量使用此类加载所有资源、instantiate节点实例，否则需要自行管理引用计数
+2. Res.instantiate不要对动态生成的节点使用，尽量只instantiate prefab上预设好的节点，否则有可能会导致引用计数的管理出错
+3. 调用load接口时如需传入release参数，则同一资源在全局调用load时release参数都应保持一致，否则可能不符合预期
+
+- **方法**
+    - **`get<T extends cc.Asset>(url: string, type: typeof cc.Asset): T`**  获取缓存资源。通常不应直接调用此接口，除非调用前能确保资源已加载并且能自行管理引用计数
+    - **`load<T extends cc.Asset>(url: string, type: typeof cc.Asset, release: boolean = true): Promise<T>`**  加载resources文件夹下单个资源
+    - **`loadDir<T extends cc.Asset>(url: string, type: typeof cc.Asset, release: boolean = true): Promise<T[]>`**  加载resources文件夹下某个文件夹内某类资源
+    - **`instantiate(original: cc.Node | cc.Prefab, related?: cc.Node | cc.Prefab): cc.Node`**  获取节点实例，建立节点与缓存prefab的联系
+    - **`releaseAll()`**  尝试释放所有缓存资源
 
 #### <a id="framework-audio"></a>音频管理器
 >文件路径(scripts/common/util/AudioManager.ts)
@@ -227,20 +269,27 @@ export default class Test extends cc.Component {
 
 支持文字以及图片的多语言切换，不同语言的同一图片需命名一致，配置路径如下，如需更改配置路径请自行更换。详见工程示例
 
-语言表路径：scripts/i18n/config/En.ts和scripts/i18n/config/Zh.ts
+>语言表路径：scripts/i18n/config/En.ts和scripts/i18n/config/Zh.ts
 
-图片路径：resources/textures/localizedImage/en/和resources/textures/localizedImage/zh/
+>图片路径：resources/textures/localizedImage/en/和resources/textures/localizedImage/zh/
 
+
+如果需要替换字符串中的占位符（形如"**%{xxx}**"的字符串为占位符），支持以下两种不同的传参形式来获取替换后的字符串
+```typescript
+// 语言表 {"test": "test %{arg1} %{arg2} !!!"}
+I18n.getText('test', {arg1: 'somthing', arg2: 2}); // => 'test somthing 2 !!!'
+I18n.getText('test', 'somthing', 2); // => 'test somthing 2 !!!'
+```
 
 - **属性**
-    - **`curLang: LangType`**  当前语言
+    - **`curLang: LangType`**  当前语言类型
 
 - **方法**
     - **`init(language: LangType = LangType.NONE)`**  初始化语言
     - **`switch(language: LangType)`**  切换语言
     - **`updateLocalizedCmpt()`**  更新所有多语言组件
     - **`getKeyByValue(value: string): string`**  通过语言表value获取对应的key
-    - **`getText(key: string, opt?: any): string`**  获取语言表中的字符串
+    - **`getText(key: string, ...option: [{ [k: string]: string | number }] | Array<string | number>): string`**  通过key获取语言表中的字符串
 
 
 #### <a id="framework-ui"></a>一些ui组件

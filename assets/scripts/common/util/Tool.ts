@@ -1,3 +1,5 @@
+import { Group, Tween, TWEEN } from "./Tween";
+
 /**
  * 工具类
  */
@@ -47,6 +49,21 @@ export default class Tool {
             cmpt.scheduleOnce(() => {
                 resolve();
             }, seconds);
+        });
+    }
+
+    /**
+     * 异步等待 - tween 默认group为TWEEN
+     */
+    public static waitTween(cmpt: cc.Component, seconds: number, group: Group = TWEEN): Promise<void> {
+        return new Promise((resolve, reject) => {
+            new Tween({ k: 0 }, group)
+                .to({ k: 1 }, seconds * 1000)
+                .onComplete(() => {
+                    resolve();
+                })
+                .start()
+                .bindCCObject(cmpt);
         });
     }
 
@@ -103,7 +120,7 @@ export default class Tool {
     }
 
     /**
-     * 获取区间[min, max)的整数，传入1个参数则区间为[0, arg1)
+     * 获取区间[min, max)的整数，传入1个参数则区间为[0, min)
      */
     public static randInt(min: number, max: number = undefined) {
         if (max === undefined) {
@@ -116,7 +133,7 @@ export default class Tool {
     }
 
     /**
-     * 获取区间[min, max)的浮点数，传入1个参数则区间为[0, arg1)
+     * 获取区间[min, max)的浮点数，传入1个参数则区间为[0, min)
      */
     public static randFloat(min: number, max: number = undefined) {
         if (max === undefined) {
@@ -165,9 +182,11 @@ export default class Tool {
 
     /**
      * 判断数组中是否有某个元素
+     * @param arr 数组
+     * @param param 元素值或表达元素值满足某种条件的函数
      */
-    public static arrayHas<T>(arr: T[], ele: T): boolean {
-        let idx = arr.findIndex((e) => { return e === ele; });
+    public static arrayHas<T>(arr: T[], param: T | ((ele: T) => boolean)): boolean {
+        let idx = typeof param !== "function" ? arr.findIndex((e) => { return e === param; }) : arr.findIndex(param as ((ele: T) => boolean));
         return idx >= 0;
     }
 
@@ -229,8 +248,18 @@ export default class Tool {
         if (node instanceof cc.Node) {
             cb.call(thisArg, node);
             node.children.forEach((n: cc.Node) => { this.nodeRecursive(n, cb, thisArg); });
-        } else {
+        } else if (Array.isArray(node)) {
             node.forEach((n: cc.Node) => { this.nodeRecursive(n, cb, thisArg); });
         }
+    }
+
+    /**
+     * destroy并立即remove传入节点的所有子节点
+     */
+    public static clearChildren(...nodes: cc.Node[]) {
+        nodes.forEach((e) => {
+            e.destroyAllChildren();
+            e.removeAllChildren();
+        });
     }
 }

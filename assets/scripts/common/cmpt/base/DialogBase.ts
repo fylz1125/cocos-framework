@@ -60,10 +60,13 @@ export default class DialogBase extends cc.Component {
     }
 
     /**
-     * 关闭动画
+     * 关闭动画，动画结束回调中会调用close销毁
      */
     public playClose() {
         if (this.DlgAnim && this.CloseClip) {
+            if (this.DlgAnim.getAnimationState(this.CloseClip.name).isPlaying) {
+                return;
+            }
             this.DlgAnim.play(this.CloseClip.name);
         } else {
             this.close();
@@ -72,14 +75,15 @@ export default class DialogBase extends cc.Component {
 
     /**
      * @virtual
-     * 打开弹窗
+     * 打开弹窗时的处理
      */
     public open(...args: any[]): any {
     }
 
     /**
      * @virtual
-     * 关闭弹窗，必须调用此接口关闭，子类重写时请调用super.close()
+     * 关闭弹窗，销毁节点时的处理。
+     * - 必须使用此接口销毁，子类重写时请调用super.close()
      */
     public close(): any {
         this._resolveList.forEach((resolve) => { resolve(); });
@@ -92,7 +96,7 @@ export default class DialogBase extends cc.Component {
      * 关闭按钮回调
      */
     protected onClickClose() {
-        this.DlgAnim ? this.playClose() : this.close();
+        this.playClose();
     }
 
     /**
